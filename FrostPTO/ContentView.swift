@@ -34,12 +34,12 @@ struct ContentView: View {
                         PreferencesView(onPTOSetup: { router.path = [] })
                     }
                 }
-                .safeAreaInset(edge: .bottom, content: {
-                    BottomBar(onSelect: { route in
-                        router.path = [route]
-                    })
-                })
         }
+        .safeAreaInset(edge: .bottom, content: {
+            BottomBar(onSelect: { route in
+                router.path = [route]
+            })
+        })
         .environmentObject(router)
     }
 }
@@ -429,48 +429,46 @@ private struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Personal Information")) {
-                    HStack {
-                        Text("Name")
-                        Spacer()
-                        TextField("Full Name", text: $settings.employeeName)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    HStack {
-                        Text("Employee ID")
-                        Spacer()
-                        TextField("ID", text: $settings.employeeID)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    HStack {
-                        Text("Department")
-                        Spacer()
-                        TextField("Department", text: $settings.department)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    HStack {
-                        Text("Manager")
-                        Spacer()
-                        TextField("Manager Name", text: $settings.manager)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    DatePicker("Hire Date", selection: $settings.hireDate, displayedComponents: .date)
-                        .datePickerStyle(.compact)
+        Form {
+            Section(header: Text("Personal Information")) {
+                HStack {
+                    Text("Name")
+                    Spacer()
+                    TextField("Full Name", text: $settings.employeeName)
+                        .multilineTextAlignment(.trailing)
                 }
+                
+                HStack {
+                    Text("Employee ID")
+                    Spacer()
+                    TextField("ID", text: $settings.employeeID)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("Department")
+                    Spacer()
+                    TextField("Department", text: $settings.department)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("Manager")
+                    Spacer()
+                    TextField("Manager Name", text: $settings.manager)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                DatePicker("Hire Date", selection: $settings.hireDate, displayedComponents: .date)
+                    .datePickerStyle(.compact)
             }
-            .navigationTitle("Edit Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        }
+        .navigationTitle("Edit Profile")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
         }
