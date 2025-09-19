@@ -8,8 +8,19 @@
 import SwiftUI
 
 struct RootView: View {
+    @AppStorage("colorScheme") private var colorSchemeSetting: String = "system"
+
+    private var preferredScheme: ColorScheme? {
+        switch colorSchemeSetting {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil // follow system
+        }
+    }
+
     var body: some View {
         ContentView()
+            .preferredColorScheme(preferredScheme)
     }
 }
 

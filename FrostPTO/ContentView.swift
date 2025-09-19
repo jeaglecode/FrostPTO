@@ -287,11 +287,25 @@ private struct BottomBar: View {
     let onSelect: (Route) -> Void
     let selected: Route?
 
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var barBackground: Color {
+        colorScheme == .dark ? .black : Color.clear
+    }
+
+    private var dividerColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+    }
+
+    private var unselectedColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Divider()
                 .frame(height: 0.5)
-                .background(Color.black.opacity(0.08))
+                .background(dividerColor)
             HStack(spacing: 16) {
                 Group {
                     Button(action: { onSelect(.planner) }) {
@@ -323,13 +337,15 @@ private struct BottomBar: View {
                         Text("Profile")
                             .font(.caption2)
                     }
-                    .foregroundColor(selected == .preferences ? .accentColor : .black)
+                    .foregroundColor(selected == .preferences ? .accentColor : unselectedColor)
                     .padding(.horizontal, 4)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
+            .background(
+                colorScheme == .dark ? AnyShapeStyle(Color.black) : AnyShapeStyle(.ultraThinMaterial)
+            )
         }
     }
 }
@@ -338,6 +354,10 @@ private struct BarItem: View {
     let title: String
     let systemImage: String
     let selected: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var unselectedColor: Color { colorScheme == .dark ? .white : .black }
+
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
@@ -345,7 +365,7 @@ private struct BarItem: View {
             Text(title)
                 .font(.caption2)
         }
-        .foregroundColor(selected ? .accentColor : .black)
+        .foregroundColor(selected ? .accentColor : unselectedColor)
         .padding(.vertical, 2)
     }
 }
@@ -511,16 +531,23 @@ private struct ProfileEditView: View {
 
 private struct ProfileAvatarWithGear: View {
     let selected: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    private var unselectedColor: Color { colorScheme == .dark ? .white : .black }
+
     var body: some View {
         ZStack {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 20))
-                .foregroundColor(selected ? .accentColor : .black)
+                .foregroundColor(selected ? .accentColor : unselectedColor)
 
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 8))
                 .foregroundColor(.white)
-                .background(Circle().fill(selected ? Color.accentColor : Color.black).frame(width: 12, height: 12))
+                .background(
+                    Circle()
+                        .fill(selected ? Color.accentColor : (colorScheme == .dark ? Color.black : Color.black))
+                        .frame(width: 12, height: 12)
+                )
                 .offset(x: 8, y: 8)
         }
     }
@@ -538,4 +565,3 @@ private struct ProfileAvatarWithGear: View {
             .environmentObject(SettingsStore())
     }
 }
-
