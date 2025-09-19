@@ -31,14 +31,15 @@ struct ContentView: View {
                     case .reports:
                         PlaceholderPage(title: "Reports", systemImage: "chart.bar")
                     case .preferences:
-                        PreferencesView(onPTOSetup: { router.path = [] })
+                        PreferencesView()
                     }
                 }
         }
         .safeAreaInset(edge: .bottom, content: {
-            BottomBar(onSelect: { route in
-                router.path = [route]
-            })
+            BottomBar(
+                onSelect: { route in router.path = [route] },
+                selected: router.path.last ?? .planner
+            )
         })
         .environmentObject(router)
     }
@@ -53,6 +54,52 @@ enum Route: Hashable {
 }
 
 struct SettingsPanelView: View {
+    @EnvironmentObject private var settings: SettingsStore
+
+    private static let numberFormatter: NumberFormatter = {
+        let nf = NumberFormatter()
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = 2
+        nf.minimumFractionDigits = 0
+        return nf
+    }()
+
+    private var formattedBalance: String {
+        let bal = settings.estimatedBalance()
+        return Self.numberFormatter.string(from: NSNumber(value: bal)) ?? String(format: "%.2f", bal)
+    }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color.accentColor.opacity(0.25), Color.clear], startPoint: .top, endPoint: .center)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Hero header (condensed)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(formattedBalance)
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            Text("hours available")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 0)
+
+                    Spacer(minLength: 24)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+}
+
+struct PTOPreferencesForm: View {
     @EnvironmentObject private var settings: SettingsStore
 
     @AppStorage("colorScheme") private var colorSchemeSetting: String = "system" // system | light | dark
@@ -101,152 +148,129 @@ struct SettingsPanelView: View {
         return nf
     }()
 
-    private var formattedBalance: String {
-        let bal = settings.estimatedBalance()
-        return Self.numberFormatter.string(from: NSNumber(value: bal)) ?? String(format: "%.2f", bal)
-    }
-
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [Color.accentColor.opacity(0.25), Color.clear], startPoint: .top, endPoint: .center)
-                .ignoresSafeArea()
+        ScrollView {
+            VStack(spacing: 20) {
+           
+                Card {
+                    Text("Starting balance")
+                        .font(.headline)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("Hours")
+                            Spacer()
+                            TextField("0", value: $settings.startBal, formatter: Self.numberFormatter)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: 160)
+                        }
+                        DatePicker("Starting balance date", selection: $settings.startDate, displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                    }
+                }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Hero header (condensed)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(formattedBalance)
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .foregroundColor(.primary)
-                            Text("hours available")
-                                .font(.subheadline)
+                // Accrual Card
+                Card {
+                    Text("Accrual")
+                        .font(.headline)
+                    VStack(spacing: 12) {
+                        Picker("Mode", selection: $settings.mode) {
+                            Text("Per year").tag(SettingsStore.AccrualMode.perYear)
+                            Text("Per period").tag(SettingsStore.AccrualMode.perPeriod)
+                        }
+                        .pickerStyle(.segmented)
+
+                        if settings.mode == .perYear {
+                            HStack {
+                                Text("Hours per year")
+                                Spacer()
+                                TextField("0", value: $settings.hoursPerYear, formatter: Self.numberFormatter)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(maxWidth: 160)
+                            }
+                        }
+
+                        if settings.mode == .perPeriod {
+                            HStack {
+                                Text("Hours per event")
+                                Spacer()
+                                TextField("0", value: $settings.hoursPerPeriod, formatter: Self.numberFormatter)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(maxWidth: 160)
+                            }
+
+                            HStack {
+                                Text("Period")
+                                Spacer()
+                                Picker("Period", selection: $settings.period) {
+                                    ForEach(SettingsStore.Period.allCases) { p in
+                                        Text(p.label).tag(p)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
+
+                            if settings.period == .custom {
+                                HStack {
+                                    Text("Custom days")
+                                    Spacer()
+                                    TextField("days", value: $settings.customDays, formatter: Self.integerFormatter)
+                                        .keyboardType(.numberPad)
+                                        .multilineTextAlignment(.trailing)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(maxWidth: 160)
+                                }
+                            }
+
+                            Text("For semi-monthly, enter hours per event.")
+                                .font(.footnote)
                                 .foregroundColor(.secondary)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 0)
-
-                    // Starting Balance Card
-                    Card {
-                        Text("Starting balance")
-                            .font(.headline)
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("Hours")
-                                Spacer()
-                                TextField("0", value: $settings.startBal, formatter: Self.numberFormatter)
-                                    .keyboardType(.decimalPad)
-                                    .multilineTextAlignment(.trailing)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(maxWidth: 160)
-                            }
-                            DatePicker("Starting balance date", selection: $settings.startDate, displayedComponents: .date)
-                                .datePickerStyle(.compact)
-                        }
-                    }
-
-                    // Accrual Card
-                    Card {
-                        Text("Accrual")
-                            .font(.headline)
-                        VStack(spacing: 12) {
-                            Picker("Mode", selection: $settings.mode) {
-                                Text("Per year").tag(SettingsStore.AccrualMode.perYear)
-                                Text("Per period").tag(SettingsStore.AccrualMode.perPeriod)
-                            }
-                            .pickerStyle(.segmented)
-
-                            if settings.mode == .perYear {
-                                HStack {
-                                    Text("Hours per year")
-                                    Spacer()
-                                    TextField("0", value: $settings.hoursPerYear, formatter: Self.numberFormatter)
-                                        .keyboardType(.decimalPad)
-                                        .multilineTextAlignment(.trailing)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(maxWidth: 160)
-                                }
-                            }
-
-                            if settings.mode == .perPeriod {
-                                HStack {
-                                    Text("Hours per event")
-                                    Spacer()
-                                    TextField("0", value: $settings.hoursPerPeriod, formatter: Self.numberFormatter)
-                                        .keyboardType(.decimalPad)
-                                        .multilineTextAlignment(.trailing)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(maxWidth: 160)
-                                }
-
-                                HStack {
-                                    Text("Period")
-                                    Spacer()
-                                    Picker("Period", selection: $settings.period) {
-                                        ForEach(SettingsStore.Period.allCases) { p in
-                                            Text(p.label).tag(p)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
-                                }
-
-                                if settings.period == .custom {
-                                    HStack {
-                                        Text("Custom days")
-                                        Spacer()
-                                        TextField("days", value: $settings.customDays, formatter: Self.integerFormatter)
-                                            .keyboardType(.numberPad)
-                                            .multilineTextAlignment(.trailing)
-                                            .textFieldStyle(.roundedBorder)
-                                            .frame(maxWidth: 160)
-                                    }
-                                }
-
-                                Text("For semi-monthly, enter hours per event.")
-                                    .font(.footnote)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-
-                    // Carryover Card
-                    Card {
-                        Text("Carryover")
-                            .font(.headline)
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("Cap (hours)")
-                                Spacer()
-                                TextField("optional", text: carryCapTextBinding)
-                                    .keyboardType(.decimalPad)
-                                    .multilineTextAlignment(.trailing)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(maxWidth: 160)
-                            }
-
-                            Toggle("Use default Jan 1 reset", isOn: useDefaultCarryResetBinding)
-
-                            if settings.carryReset != nil {
-                                DatePicker("Carryover reset date", selection: Binding<Date>(
-                                    get: { settings.carryReset ?? SettingsStore.jan1(of: Date()) },
-                                    set: { settings.carryReset = $0 }
-                                ), displayedComponents: .date)
-                                .datePickerStyle(.compact)
-                            }
-                        }
-                    }
-
-                    Spacer(minLength: 24)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 24)
+
+                // Carryover Card
+                Card {
+                    Text("Carryover")
+                        .font(.headline)
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("Cap (hours)")
+                            Spacer()
+                            TextField("optional", text: carryCapTextBinding)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: 160)
+                        }
+
+                        Toggle("Use default Jan 1 reset", isOn: useDefaultCarryResetBinding)
+
+                        if settings.carryReset != nil {
+                            DatePicker("Carryover reset date", selection: Binding<Date>(
+                                get: { settings.carryReset ?? SettingsStore.jan1(of: Date()) },
+                                set: { settings.carryReset = $0 }
+                            ), displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                        }
+                    }
+                }
+                
+                Spacer(minLength: 24)
             }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
         }
+        .navigationTitle("PTO Preferences")
+        // Removed navigationBarTitleDisplayMode(.inline) to restore default modal look
     }
 }
 
-// Lightweight reusable Card container
 private struct Card<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
@@ -261,6 +285,8 @@ private struct Card<Content: View>: View {
 // Bottom bar with 4 placeholder icons on the left and profile/settings on the right
 private struct BottomBar: View {
     let onSelect: (Route) -> Void
+    let selected: Route?
+
     var body: some View {
         VStack(spacing: 0) {
             Divider()
@@ -269,22 +295,22 @@ private struct BottomBar: View {
             HStack(spacing: 16) {
                 Group {
                     Button(action: { onSelect(.planner) }) {
-                        BarItem(title: "Planner", systemImage: "calendar")
+                        BarItem(title: "Home", systemImage: "house.fill", selected: selected == .planner)
                     }
                     .frame(maxWidth: .infinity)
 
                     Button(action: { onSelect(.requests) }) {
-                        BarItem(title: "Requests", systemImage: "doc.text")
+                        BarItem(title: "Requests", systemImage: "doc.text", selected: selected == .requests)
                     }
                     .frame(maxWidth: .infinity)
 
                     Button(action: { onSelect(.history) }) {
-                        BarItem(title: "History", systemImage: "clock")
+                        BarItem(title: "History", systemImage: "clock", selected: selected == .history)
                     }
                     .frame(maxWidth: .infinity)
 
                     Button(action: { onSelect(.reports) }) {
-                        BarItem(title: "Reports", systemImage: "chart.bar")
+                        BarItem(title: "Reports", systemImage: "chart.bar", selected: selected == .reports)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -293,11 +319,11 @@ private struct BottomBar: View {
 
                 Button(action: { onSelect(.preferences) }) {
                     VStack(spacing: 4) {
-                        ProfileAvatarWithGear()
+                        ProfileAvatarWithGear(selected: selected == .preferences)
                         Text("Profile")
                             .font(.caption2)
                     }
-                    .foregroundColor(.primary)
+                    .foregroundColor(selected == .preferences ? .accentColor : .black)
                     .padding(.horizontal, 4)
                 }
             }
@@ -311,6 +337,7 @@ private struct BottomBar: View {
 private struct BarItem: View {
     let title: String
     let systemImage: String
+    let selected: Bool
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
@@ -318,7 +345,7 @@ private struct BarItem: View {
             Text(title)
                 .font(.caption2)
         }
-        .foregroundColor(.primary)
+        .foregroundColor(selected ? .accentColor : .black)
         .padding(.vertical, 2)
     }
 }
@@ -343,26 +370,33 @@ private struct PlaceholderPage: View {
 
 private struct PreferencesView: View {
     @EnvironmentObject private var settings: SettingsStore
-    let onPTOSetup: () -> Void
-    
     @AppStorage("colorScheme") private var colorSchemeSetting: String = "system"
-
-    init(onPTOSetup: @escaping () -> Void = {}) {
-        self.onPTOSetup = onPTOSetup
-    }
+    @State private var showPTOPreferences = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Quick Action at top
                 Button {
-                    onPTOSetup()
+                    showPTOPreferences = true
                 } label: {
                     Label("PTO Setup", systemImage: "wrench.and.screwdriver")
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .sheet(isPresented: $showPTOPreferences) {
+                    ZStack(alignment: .top) {
+                        NavigationStack {
+                            PTOPreferencesForm()
+                                .environmentObject(settings)
+                        }
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.4))
+                            .frame(width: 60, height: 8)
+                            .padding(.top, 18)
+                    }
+                }
 
                 // Profile Section
                 VStack(alignment: .leading, spacing: 12) {
@@ -427,7 +461,7 @@ private struct PreferencesView: View {
 private struct ProfileEditView: View {
     @EnvironmentObject private var settings: SettingsStore
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         Form {
             Section(header: Text("Personal Information")) {
@@ -437,28 +471,28 @@ private struct ProfileEditView: View {
                     TextField("Full Name", text: $settings.employeeName)
                         .multilineTextAlignment(.trailing)
                 }
-                
+
                 HStack {
                     Text("Employee ID")
                     Spacer()
                     TextField("ID", text: $settings.employeeID)
                         .multilineTextAlignment(.trailing)
                 }
-                
+
                 HStack {
                     Text("Department")
                     Spacer()
                     TextField("Department", text: $settings.department)
                         .multilineTextAlignment(.trailing)
                 }
-                
+
                 HStack {
                     Text("Manager")
                     Spacer()
                     TextField("Manager Name", text: $settings.manager)
                         .multilineTextAlignment(.trailing)
                 }
-                
+
                 DatePicker("Hire Date", selection: $settings.hireDate, displayedComponents: .date)
                     .datePickerStyle(.compact)
             }
@@ -476,16 +510,17 @@ private struct ProfileEditView: View {
 }
 
 private struct ProfileAvatarWithGear: View {
+    let selected: Bool
     var body: some View {
         ZStack {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 20))
-                .foregroundStyle(.tint)
-            
+                .foregroundColor(selected ? .accentColor : .black)
+
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 8))
                 .foregroundColor(.white)
-                .background(Circle().fill(.tint).frame(width: 12, height: 12))
+                .background(Circle().fill(selected ? Color.accentColor : Color.black).frame(width: 12, height: 12))
                 .offset(x: 8, y: 8)
         }
     }
@@ -499,7 +534,8 @@ private struct ProfileAvatarWithGear: View {
 
 #Preview("PreferencesView") {
     NavigationStack {
-        PreferencesView(onPTOSetup: {})
+        PreferencesView()
+            .environmentObject(SettingsStore())
     }
-    .environmentObject(SettingsStore())
 }
+
