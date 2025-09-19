@@ -13,35 +13,54 @@ final class NavRouter: ObservableObject {
 }
 
 struct ContentView: View {
-    @StateObject private var router = NavRouter()
+    @State private var selected: Route = .planner
 
     var body: some View {
-        NavigationStack(path: $router.path) {
-            SettingsPanelView()
-                .navigationTitle("PTO Planner")
-                .navigationBarTitleDisplayMode(.large)
-                .navigationDestination(for: Route.self) { route in
-                    switch route {
-                    case .planner:
-                        PlaceholderPage(title: "Planner", systemImage: "calendar")
-                    case .requests:
-                        PlaceholderPage(title: "Requests", systemImage: "doc.text")
-                    case .history:
-                        PlaceholderPage(title: "History", systemImage: "clock")
-                    case .reports:
-                        PlaceholderPage(title: "Reports", systemImage: "chart.bar")
-                    case .preferences:
-                        PreferencesView()
-                    }
+        Group {
+            switch selected {
+            case .planner:
+                NavigationStack {
+                    SettingsPanelView()
+                        .navigationTitle("PTO Planner")
+                        .navigationBarTitleDisplayMode(.large)
                 }
+                .id(Route.planner)
+
+            case .requests:
+                NavigationStack {
+                    PlaceholderPage(title: "Requests", systemImage: "doc.text")
+                }
+                .id(Route.requests)
+
+            case .history:
+                NavigationStack {
+                    PlaceholderPage(title: "History", systemImage: "clock")
+                }
+                .id(Route.history)
+
+            case .reports:
+                NavigationStack {
+                    PlaceholderPage(title: "Reports", systemImage: "chart.bar")
+                }
+                .id(Route.reports)
+
+            case .preferences:
+                NavigationStack {
+                    PreferencesView()
+                }
+                .id(Route.preferences)
+            }
         }
         .safeAreaInset(edge: .bottom, content: {
             BottomBar(
-                onSelect: { route in router.path = [route] },
-                selected: router.path.last ?? .planner
+                onSelect: { route in
+                    // Switch tabs with no animations
+                    withAnimation(.none) { selected = route }
+                },
+                selected: selected
             )
         })
-        .environmentObject(router)
+        .animation(nil, value: selected)
     }
 }
 
@@ -385,6 +404,7 @@ private struct PlaceholderPage: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 
@@ -474,6 +494,7 @@ private struct PreferencesView: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Profile")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 
