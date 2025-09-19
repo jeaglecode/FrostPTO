@@ -22,7 +22,13 @@ struct ContentView: View {
                 NavigationStack {
                     SettingsPanelView()
                         .navigationTitle("PTO Planner")
-                        .navigationBarTitleDisplayMode(.large)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .principal) {
+                                Text("PTO Planner")
+                                    .font(.title2.weight(.semibold))
+                            }
+                        }
                 }
                 .id(Route.planner)
 
@@ -286,7 +292,7 @@ struct PTOPreferencesForm: View {
             .padding(.bottom, 24)
         }
         .navigationTitle("PTO Preferences")
-        // Removed navigationBarTitleDisplayMode(.inline) to restore default modal look
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -404,7 +410,13 @@ private struct PlaceholderPage: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+            }
+        }
     }
 }
 
@@ -434,7 +446,7 @@ private struct PreferencesView: View {
                         Capsule()
                             .fill(Color.secondary.opacity(0.4))
                             .frame(width: 60, height: 8)
-                            .padding(.top, 18)
+                            .padding(.top, 8)
                     }
                 }
 
@@ -494,7 +506,13 @@ private struct PreferencesView: View {
             .padding(.vertical, 16)
         }
         .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Profile")
+                    .font(.title2.weight(.semibold))
+            }
+        }
     }
 }
 
