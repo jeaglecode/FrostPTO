@@ -101,8 +101,8 @@ class SettingsStore: ObservableObject {
         self.startDate = defaults.object(forKey: Keys.startDate) != nil ? Date(timeIntervalSince1970: sdInterval) : Date()
         let modeRaw = defaults.string(forKey: Keys.mode) ?? AccrualMode.perYear.rawValue
         self.mode = AccrualMode(rawValue: modeRaw) ?? .perYear
-        self.hoursPerYear = defaults.object(forKey: Keys.hoursPerYear) != nil ? defaults.double(forKey: Keys.hoursPerYear) : 80
-        self.hoursPerPeriod = defaults.object(forKey: Keys.hoursPerPeriod) != nil ? defaults.double(forKey: Keys.hoursPerPeriod) : 3.08
+        self.hoursPerYear = defaults.object(forKey: Keys.hoursPerYear) != nil ? defaults.double(forKey: Keys.hoursPerYear) : 120.0
+        self.hoursPerPeriod = defaults.object(forKey: Keys.hoursPerPeriod) != nil ? defaults.double(forKey: Keys.hoursPerPeriod) : 5.0
         let periodRaw = defaults.string(forKey: Keys.period) ?? Period.biweekly.rawValue
         self.period = Period(rawValue: periodRaw) ?? .biweekly
         self.customDays = defaults.object(forKey: Keys.customDays) != nil ? defaults.integer(forKey: Keys.customDays) : 30
@@ -113,9 +113,75 @@ class SettingsStore: ObservableObject {
 
     func estimatedBalance() -> Double {
         let now = Date()
-        // Use timeIntervalSince to compute seconds since start, clamped to 0
+        
+        // Calculate days between start and now, matching Angular logic
+        let calendar = Calendar.current
+        let startOfStartDate = calendar.startOfDay(for: startDate)
+        let startOfToday = calendar.startOfDay(for: now)
+        
+        // Use whole days only, matching Angular's Math.floor behavior
+        let daysPassed = max(0, calendar.dateComponents([.day], from: startOfStartDate, to: startOfToday).day ?? 0)
+        
+        var accruedHours: Double = 0
+        
+        switch mode {
+        case .perYear:
+            // Match Angular: days + 1 for inclusive counting, and use 365 days per year
+            let inclusiveDays = Double(daysPassed + 1)
+            accruedHours = hoursPerYear / 365.0 * inclusiveDays
+        case .perPeriod:
+            // Ensure we never divide by zero for custom period
+            let baseDays = period == .custom ? customDays : period.days
+            let periodDays = max(1, baseDays)
+            
+            if period.rawValue == "semimonthly" {
+                // Special handling for semi-monthly to match Angular
+                accruedHours = hoursPerPeriod * Double(countSemiMonthlyPeriods(from: startOfStartDate, to: startOfToday))
+            } else {
+                let periodsElapsed = Double(daysPassed) / Double(periodDays)
+                accruedHours = hoursPerPeriod * floor(periodsElapsed)
+            }
+        }
+        
+        return startBal + accruedHours
+    }
+    
+    // Helper method to count semi-monthly periods (matching Angular logic)
+    private func countSemiMonthlyPeriods(from start: Date, to end: Date) -> Int {
+        let calendar = Calendar.current
+        var count = 0
+        
+        var currentDate = start
+        while currentDate <= end {
+            let year = calendar.component(.year, from: currentDate)
+            let month = calendar.component(.month, from: currentDate)
+            
+            // 15th of the month
+            if let fifteenth = calendar.date(from: DateComponents(year: year, month: month, day: 15)),
+               fifteenth > start && fifteenth <= end {
+                count += 1
+            }
+            
+            // Last day of the month
+            let range = calendar.range(of: .day, in: .month, for: currentDate)!
+            if let lastDay = calendar.date(from: DateComponents(year: year, month: month, day: range.count)),
+               lastDay > start && lastDay <= end {
+                count += 1
+            }
+            
+            // Move to next month
+            currentDate = calendar.date(byAdding: .month, value: 1, to: currentDate) ?? end.addingTimeInterval(86400)
+            if currentDate > end { break }
+        }
+        
+        return count
+    }
+    
+    // Helper method for debugging balance calculations
+    func balanceBreakdown() -> (startBalance: Double, accruedHours: Double, daysPassed: Double) {
+        let now = Date()
         let secondsSinceStart = max(0, now.timeIntervalSince(startDate))
-        let daysPassed = secondsSinceStart / 86400 // seconds to days
+        let daysPassed = secondsSinceStart / 86400
         
         var accruedHours: Double = 0
         
@@ -124,14 +190,13 @@ class SettingsStore: ObservableObject {
             let yearsElapsed = daysPassed / 365.25
             accruedHours = hoursPerYear * yearsElapsed
         case .perPeriod:
-            // Ensure we never divide by zero for custom period
             let baseDays = period == .custom ? Double(customDays) : Double(period.days)
             let periodDays = max(1.0, baseDays)
             let periodsElapsed = daysPassed / periodDays
             accruedHours = hoursPerPeriod * periodsElapsed
         }
         
-        return startBal + accruedHours
+        return (startBal, accruedHours, daysPassed)
     }
     
     static func jan1(of date: Date) -> Date {
