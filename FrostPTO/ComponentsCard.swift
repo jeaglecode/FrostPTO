@@ -511,29 +511,44 @@ extension AccrualWindow {
         let calendar = Calendar.current
         var windows: [AccrualWindow] = []
         
+        // Get the start date from settings
+        let startDate = settings.startDate
+        let startYear = calendar.component(.year, from: startDate)
+        
+        // If the start date is after the requested year, return empty
+        if startYear > year {
+            return []
+        }
+        
         switch settings.mode {
         case .perYear:
             // For per-year mode, create one window for the entire year
-            // Accrual date is December 31st of the year
-            guard let yearEnd = calendar.date(from: DateComponents(year: year, month: 12, day: 31)),
-                  let previousYearEnd = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) else {
+            // But start from the settings start date if it's in this year
+            let windowStartDate = startYear == year ? startDate : 
+                calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? startDate
+            
+            guard let yearEnd = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) else {
                 return []
             }
             
-            let window = AccrualWindow(
-                start: formatDate(previousYearEnd),
-                endDisplay: formatDate(yearEnd),
-                accrualDate: formatDate(yearEnd),
-                startBalance: settings.startBal,
-                ptoUsed: 0.0,
-                computedAccrual: settings.hoursPerYear,
-                accrualOverride: settings.hoursPerYear,
-                entries: []
-            )
-            windows.append(window)
+            // Only create window if the start date is before or during the requested year
+            if windowStartDate <= yearEnd {
+                let window = AccrualWindow(
+                    start: formatDate(windowStartDate),
+                    endDisplay: formatDate(yearEnd),
+                    accrualDate: formatDate(yearEnd),
+                    startBalance: settings.startBal,
+                    ptoUsed: 0.0,
+                    computedAccrual: settings.hoursPerYear,
+                    accrualOverride: settings.hoursPerYear,
+                    entries: []
+                )
+                windows.append(window)
+            }
             
         case .perPeriod:
             // Generate accrual windows based on 15th and last day of each month
+            // Starting from the settings start date
             windows = generateAccrualWindows(for: year, settings: settings)
         }
         
@@ -544,29 +559,48 @@ extension AccrualWindow {
         let calendar = Calendar.current
         var windows: [AccrualWindow] = []
         
-        // Start from December 31st of previous year
-        guard let previousYearEnd = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) else {
+        let startDate = settings.startDate
+        let startYear = calendar.component(.year, from: startDate)
+        let startMonth = calendar.component(.month, from: startDate)
+        
+        // Determine the actual window start date
+        var windowStart: Date
+        
+        if startYear == year {
+            // If start date is in the requested year, use it as the first window start
+            windowStart = startDate
+        } else if startYear < year {
+            // If start date is before the requested year, start from Dec 31 of previous year
+            windowStart = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) ?? startDate
+        } else {
+            // Start date is after requested year, return empty
             return []
         }
         
-        var windowStart = previousYearEnd
-        
-        // Generate windows for each month: 15th and last day
+        // Generate windows starting from the determined start point
         for month in 1...12 {
+            // Skip months before the start date if we're in the start year
+            if startYear == year && month < startMonth {
+                continue
+            }
+            
             // First accrual: 15th of the month
             if let fifteenth = calendar.date(from: DateComponents(year: year, month: month, day: 15)) {
-                let window = AccrualWindow(
-                    start: formatDate(windowStart),
-                    endDisplay: formatDate(fifteenth),
-                    accrualDate: formatDate(fifteenth),
-                    startBalance: calculateStartBalance(for: windowStart, settings: settings),
-                    ptoUsed: 0.0,
-                    computedAccrual: settings.hoursPerPeriod,
-                    accrualOverride: settings.hoursPerPeriod,
-                    entries: []
-                )
-                windows.append(window)
-                windowStart = fifteenth
+                // Only create window if the accrual date is after or on the start date
+                if fifteenth >= startDate {
+                    let window = AccrualWindow(
+                        start: formatDate(windowStart),
+                        endDisplay: formatDate(fifteenth),
+                        accrualDate: formatDate(fifteenth),
+                        startBalance: calculateStartBalance(for: windowStart, settings: settings),
+                        ptoUsed: 0.0,
+                        computedAccrual: settings.hoursPerPeriod,
+                        accrualOverride: settings.hoursPerPeriod,
+                        entries: []
+                    )
+                    windows.append(window)
+                    windowStart = fifteenth
+                }
             }
             
             // Second accrual: Last day of the month
@@ -574,18 +608,21 @@ extension AccrualWindow {
             let lastDay = range?.count ?? 31
             
             if let monthEnd = calendar.date(from: DateComponents(year: year, month: month, day: lastDay)) {
-                let window = AccrualWindow(
-                    start: formatDate(windowStart),
-                    endDisplay: formatDate(monthEnd),
-                    accrualDate: formatDate(monthEnd),
-                    startBalance: calculateStartBalance(for: windowStart, settings: settings),
-                    ptoUsed: 0.0,
-                    computedAccrual: settings.hoursPerPeriod,
-                    accrualOverride: settings.hoursPerPeriod,
-                    entries: []
-                )
-                windows.append(window)
-                windowStart = monthEnd
+                // Only create window if the accrual date is after or on the start date
+                if monthEnd >= startDate {
+                    let window = AccrualWindow(
+                        start: formatDate(windowStart),
+                        endDisplay: formatDate(monthEnd),
+                        accrualDate: formatDate(monthEnd),
+                        startBalance: calculateStartBalance(for: windowStart, settings: settings),
+                        ptoUsed: 0.0,
+                        computedAccrual: settings.hoursPerPeriod,
+                        accrualOverride: settings.hoursPerPeriod,
+                        entries: []
+                    )
+                    windows.append(window)
+                    windowStart = monthEnd
+                }
             }
         }
         

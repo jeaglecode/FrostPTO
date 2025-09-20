@@ -53,6 +53,12 @@ class SettingsStore: ObservableObject {
     @Published var notifications: Bool = true {
         didSet { defaults.set(notifications, forKey: Keys.notifications) }
     }
+    @Published var useStartDateForAccruals: Bool = false {
+        didSet { defaults.set(useStartDateForAccruals, forKey: Keys.useStartDateForAccruals) }
+    }
+    @Published var currentYear: Int = Calendar.current.component(.year, from: Date()) {
+        didSet { defaults.set(currentYear, forKey: Keys.currentYear) }
+    }
     
     enum AccrualMode: String, CaseIterable {
         case perYear = "perYear"
@@ -109,6 +115,8 @@ class SettingsStore: ObservableObject {
         if let capVal = defaults.object(forKey: Keys.carryCap) as? Double { self.carryCap = capVal } else { self.carryCap = nil }
         if let crInterval = defaults.object(forKey: Keys.carryReset) as? Double { self.carryReset = Date(timeIntervalSince1970: crInterval) } else { self.carryReset = nil }
         self.notifications = defaults.object(forKey: Keys.notifications) as? Bool ?? true
+        self.useStartDateForAccruals = defaults.object(forKey: Keys.useStartDateForAccruals) as? Bool ?? false
+        self.currentYear = defaults.object(forKey: Keys.currentYear) != nil ? defaults.integer(forKey: Keys.currentYear) : Calendar.current.component(.year, from: Date())
     }
 
     func estimatedBalance() -> Double {
@@ -217,5 +225,8 @@ class SettingsStore: ObservableObject {
         static let carryCap = "settings.carryCap"
         static let carryReset = "settings.carryReset"
         static let notifications = "settings.notifications"
+        static let useStartDateForAccruals = "settings.useStartDateForAccruals"
+        static let currentYear = "settings.currentYear"
     }
 }
+

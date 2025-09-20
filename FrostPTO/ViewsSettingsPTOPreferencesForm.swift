@@ -17,6 +17,7 @@ struct PTOPreferencesForm: View {
     @State private var hoursPerYearText: String = ""
     @State private var hoursPerPeriodText: String = ""
     @State private var carryCapText: String = ""
+    @State private var enableYearEdit: Bool = false
     
     private enum FocusedField: Hashable {
         case startBal, hoursPerYear, hoursPerPeriod, carryCap, customDays
@@ -51,6 +52,12 @@ struct PTOPreferencesForm: View {
         return nf
     }()
     
+    private static let ymdFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return df
+    }()
+    
     // Sanitize input to allow only digits and a single '.' as decimal separator
     private func sanitizeDotOnly(_ input: String) -> String {
         var result = ""
@@ -76,6 +83,42 @@ struct PTOPreferencesForm: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .multilineTextAlignment(.center)
                     
+                    // Current Year Picker
+                    Card {
+                        HStack {
+                            Text("Current year")
+                                .font(.headline)
+                            Text(String(settings.currentYear))
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        VStack(spacing: 12) {
+                            Toggle(isOn: $enableYearEdit) {
+                                Text("Edit year")
+                            }
+                            .toggleStyle(.switch)
+
+                            let thisYear = Calendar.current.component(.year, from: Date())
+                            let years = Array((thisYear - 5)...(thisYear + 5))
+
+                            if enableYearEdit {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Select year")
+                                    Picker("Current Year", selection: $settings.currentYear) {
+                                        ForEach(years, id: \.self) { year in
+                                            Text(String(year)).tag(year)
+                                        }
+                                    }
+                                    .pickerStyle(.wheel)
+                                    .frame(maxHeight: 160)
+                                    .clipped()
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+                            }
+                        }
+                    }
+                    
                     Card {
                         Text("Starting balance")
                             .font(.headline)
@@ -95,8 +138,26 @@ struct PTOPreferencesForm: View {
                                         if let val = Double(sanitized) { settings.startBal = val }
                                     }
                             }
-                            DatePicker("Starting balance date", selection: $settings.startDate, displayedComponents: .date)
-                                .datePickerStyle(.compact)
+                            
+                            HStack {
+                                Text("Starting balance date")
+                                Spacer()
+                                Toggle(isOn: $settings.useStartDateForAccruals) {
+                                    Text("Edit start date")
+                                }
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                            }
+
+                            if settings.useStartDateForAccruals {
+                                DatePicker("Starting balance date", selection: $settings.startDate, displayedComponents: .date)
+                                    .datePickerStyle(.compact)
+                            } else {
+                                // Read-only display of the current start date
+                                Text(Self.ymdFormatter.string(from: settings.startDate))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                     

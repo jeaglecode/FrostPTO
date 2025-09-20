@@ -88,13 +88,28 @@ struct AccrualsView: View {
         .onChange(of: settings.customDays) { _, _ in
             generateAccrualWindows()
         }
+        .onChange(of: settings.currentYear) { _, _ in
+            generateAccrualWindows()
+        }
+        .onChange(of: settings.useStartDateForAccruals) { _, _ in
+            generateAccrualWindows()
+        }
+        .onChange(of: settings.startDate) { _, _ in
+            if settings.useStartDateForAccruals { generateAccrualWindows() }
+        }
     }
     
     // MARK: - Helper Methods
     
     private func generateAccrualWindows() {
-        let currentYear = Calendar.current.component(.year, from: Date())
-        accrualWindows = AccrualWindow.generateWindows(from: settings, for: currentYear)
+        let calendar = Calendar.current
+        let selectedYear: Int
+        if settings.useStartDateForAccruals {
+            selectedYear = calendar.component(.year, from: settings.startDate)
+        } else {
+            selectedYear = settings.currentYear
+        }
+        accrualWindows = AccrualWindow.generateWindows(from: settings, for: selectedYear)
     }
     
     private func getCurrentYear() -> String {
