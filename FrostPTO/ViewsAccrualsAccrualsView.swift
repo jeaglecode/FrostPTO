@@ -49,13 +49,15 @@ struct AccrualsView: View {
                             },
                             onManageEntries: {
                                 manageEntries(for: index)
-                            }
+                            },
+                            isFirstWindow: index == 0
                         )
                         .padding(.horizontal)
                     }
                 }
             }
-            .padding(.vertical)
+            .padding(.top)
+            .padding(.bottom, 120) // Extra bottom padding to ensure last card is fully accessible
         }
         .navigationTitle("Accruals")
         .navigationBarTitleDisplayMode(.inline)

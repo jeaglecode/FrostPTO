@@ -193,26 +193,29 @@ struct AccrualWindowCard: View {
     let window: AccrualWindow
     let onOverrideChange: (Double) -> Void
     let onManageEntries: () -> Void
+    let isFirstWindow: Bool
     
     @State private var overrideValue: Double
     
-    init(window: AccrualWindow, onOverrideChange: @escaping (Double) -> Void, onManageEntries: @escaping () -> Void) {
+    init(window: AccrualWindow, onOverrideChange: @escaping (Double) -> Void, onManageEntries: @escaping () -> Void, isFirstWindow: Bool = false) {
         self.window = window
         self.onOverrideChange = onOverrideChange
         self.onManageEntries = onManageEntries
+        self.isFirstWindow = isFirstWindow
         self._overrideValue = State(initialValue: window.accrualOverride)
     }
     
     private var dateRangeText: String {
         // Format dates to be more compact
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
+        formatter.dateFormat = "yyyy-MM-dd"
         
-        let startDate = ISO8601DateFormatter().date(from: window.start + "T00:00:00Z") ?? Date()
-        let endDate = ISO8601DateFormatter().date(from: window.endDisplay + "T00:00:00Z") ?? Date()
-        
-        let startText = formatter.string(from: startDate)
-        let endText = formatter.string(from: endDate)
+        // Parse the date strings directly
+        guard let startDate = formatter.date(from: window.start),
+              let endDate = formatter.date(from: window.endDisplay) else {
+            // Fallback if parsing fails
+            return "\(window.start) - \(window.endDisplay)"
+        }
         
         // Check if same year to avoid redundancy
         let calendar = Calendar.current
@@ -220,11 +223,19 @@ struct AccrualWindowCard: View {
         let endYear = calendar.component(.year, from: endDate)
         let currentYear = calendar.component(.year, from: Date())
         
-        if startYear == endYear && startYear == currentYear {
+        // For the first window OR if years are different from current year, show years
+        if isFirstWindow || startYear != currentYear || endYear != currentYear || startYear != endYear {
+            // Show with 2-digit year
+            formatter.dateFormat = "MMM d, yy"
+            let startText = formatter.string(from: startDate)
+            let endText = formatter.string(from: endDate)
             return "\(startText) - \(endText)"
         } else {
-            formatter.dateFormat = "MMM d, yyyy"
-            return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
+            // Show without year for current year windows (except first)
+            formatter.dateFormat = "MMM d"
+            let startText = formatter.string(from: startDate)
+            let endText = formatter.string(from: endDate)
+            return "\(startText) - \(endText)"
         }
     }
     
@@ -498,144 +509,83 @@ struct PTOEntry {
 extension AccrualWindow {
     static func generateWindows(from settings: SettingsStore, for year: Int = Calendar.current.component(.year, from: Date())) -> [AccrualWindow] {
         let calendar = Calendar.current
-        guard let yearStart = calendar.date(from: DateComponents(year: year, month: 1, day: 1)),
-              let yearEnd = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) else {
-            return []
-        }
-        
         var windows: [AccrualWindow] = []
         
         switch settings.mode {
         case .perYear:
             // For per-year mode, create one window for the entire year
+            // Accrual date is December 31st of the year
+            guard let yearEnd = calendar.date(from: DateComponents(year: year, month: 12, day: 31)),
+                  let previousYearEnd = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) else {
+                return []
+            }
+            
             let window = AccrualWindow(
-                start: formatDate(yearStart),
+                start: formatDate(previousYearEnd),
                 endDisplay: formatDate(yearEnd),
                 accrualDate: formatDate(yearEnd),
                 startBalance: settings.startBal,
-                ptoUsed: 0.0, // This would be calculated from actual PTO entries
+                ptoUsed: 0.0,
                 computedAccrual: settings.hoursPerYear,
                 accrualOverride: settings.hoursPerYear,
-                entries: [] // This would be loaded from data store
+                entries: []
             )
             windows.append(window)
             
         case .perPeriod:
-            // Generate windows based on the period
-            windows = generatePeriodicWindows(
-                from: yearStart,
-                to: yearEnd,
-                settings: settings
-            )
+            // Generate accrual windows based on 15th and last day of each month
+            windows = generateAccrualWindows(for: year, settings: settings)
         }
         
         return windows
     }
     
-    private static func generatePeriodicWindows(from startDate: Date, to endDate: Date, settings: SettingsStore) -> [AccrualWindow] {
+    private static func generateAccrualWindows(for year: Int, settings: SettingsStore) -> [AccrualWindow] {
         let calendar = Calendar.current
         var windows: [AccrualWindow] = []
-        var currentStart = startDate
         
-        let periodDays = settings.period == .custom ? settings.customDays : settings.period.days
+        // Start from December 31st of previous year
+        guard let previousYearEnd = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) else {
+            return []
+        }
         
-        switch settings.period {
-        case .weekly, .biweekly, .custom:
-            // Generate windows based on day intervals
-            while currentStart < endDate {
-                let currentEnd = calendar.date(byAdding: .day, value: periodDays, to: currentStart) ?? endDate
-                let actualEnd = min(currentEnd, endDate)
-                
+        var windowStart = previousYearEnd
+        
+        // Generate windows for each month: 15th and last day
+        for month in 1...12 {
+            // First accrual: 15th of the month
+            if let fifteenth = calendar.date(from: DateComponents(year: year, month: month, day: 15)) {
                 let window = AccrualWindow(
-                    start: formatDate(currentStart),
-                    endDisplay: formatDate(actualEnd),
-                    accrualDate: formatDate(actualEnd),
-                    startBalance: calculateStartBalance(for: currentStart, settings: settings),
-                    ptoUsed: 0.0, // Would be calculated from actual entries
-                    computedAccrual: settings.hoursPerPeriod,
-                    accrualOverride: settings.hoursPerPeriod,
-                    entries: [] // Would be loaded from data store
-                )
-                windows.append(window)
-                
-                currentStart = currentEnd
-            }
-            
-        case .monthly:
-            // Generate monthly windows
-            var currentDate = startDate
-            while currentDate < endDate {
-                let nextMonth = calendar.date(byAdding: .month, value: 1, to: currentDate) ?? endDate
-                let actualEnd = min(nextMonth, endDate)
-                
-                let window = AccrualWindow(
-                    start: formatDate(currentDate),
-                    endDisplay: formatDate(actualEnd),
-                    accrualDate: formatDate(actualEnd),
-                    startBalance: calculateStartBalance(for: currentDate, settings: settings),
+                    start: formatDate(windowStart),
+                    endDisplay: formatDate(fifteenth),
+                    accrualDate: formatDate(fifteenth),
+                    startBalance: calculateStartBalance(for: windowStart, settings: settings),
                     ptoUsed: 0.0,
                     computedAccrual: settings.hoursPerPeriod,
                     accrualOverride: settings.hoursPerPeriod,
                     entries: []
                 )
                 windows.append(window)
-                
-                currentDate = nextMonth
+                windowStart = fifteenth
             }
             
-        case .semimonthly:
-            // Generate semi-monthly windows (15th and end of month)
-            var currentDate = startDate
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
+            // Second accrual: Last day of the month
+            let range = calendar.range(of: .day, in: .month, for: calendar.date(from: DateComponents(year: year, month: month, day: 1))!)
+            let lastDay = range?.count ?? 31
             
-            while currentDate < endDate {
-                let year = calendar.component(.year, from: currentDate)
-                let month = calendar.component(.month, from: currentDate)
-                
-                // First period: 1st to 15th
-                if let fifteenth = calendar.date(from: DateComponents(year: year, month: month, day: 15)),
-                   currentDate <= fifteenth && fifteenth <= endDate {
-                    
-                    let periodStart = max(currentDate, calendar.date(from: DateComponents(year: year, month: month, day: 1)) ?? currentDate)
-                    
-                    let window = AccrualWindow(
-                        start: formatDate(periodStart),
-                        endDisplay: formatDate(fifteenth),
-                        accrualDate: formatDate(fifteenth),
-                        startBalance: calculateStartBalance(for: periodStart, settings: settings),
-                        ptoUsed: 0.0,
-                        computedAccrual: settings.hoursPerPeriod,
-                        accrualOverride: settings.hoursPerPeriod,
-                        entries: []
-                    )
-                    windows.append(window)
-                }
-                
-                // Second period: 16th to end of month
-                let range = calendar.range(of: .day, in: .month, for: currentDate)
-                let daysInMonth = range?.count ?? 31
-                if let monthEnd = calendar.date(from: DateComponents(year: year, month: month, day: daysInMonth)),
-                   let sixteenth = calendar.date(from: DateComponents(year: year, month: month, day: 16)),
-                   sixteenth <= endDate {
-                    
-                    let actualEnd = min(monthEnd, endDate)
-                    
-                    let window = AccrualWindow(
-                        start: formatDate(sixteenth),
-                        endDisplay: formatDate(actualEnd),
-                        accrualDate: formatDate(actualEnd),
-                        startBalance: calculateStartBalance(for: sixteenth, settings: settings),
-                        ptoUsed: 0.0,
-                        computedAccrual: settings.hoursPerPeriod,
-                        accrualOverride: settings.hoursPerPeriod,
-                        entries: []
-                    )
-                    windows.append(window)
-                }
-                
-                // Move to next month
-                currentDate = calendar.date(byAdding: .month, value: 1, to: currentDate) ?? endDate
+            if let monthEnd = calendar.date(from: DateComponents(year: year, month: month, day: lastDay)) {
+                let window = AccrualWindow(
+                    start: formatDate(windowStart),
+                    endDisplay: formatDate(monthEnd),
+                    accrualDate: formatDate(monthEnd),
+                    startBalance: calculateStartBalance(for: windowStart, settings: settings),
+                    ptoUsed: 0.0,
+                    computedAccrual: settings.hoursPerPeriod,
+                    accrualOverride: settings.hoursPerPeriod,
+                    entries: []
+                )
+                windows.append(window)
+                windowStart = monthEnd
             }
         }
         
