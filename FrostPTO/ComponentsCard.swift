@@ -203,90 +203,248 @@ struct AccrualWindowCard: View {
         self._overrideValue = State(initialValue: window.accrualOverride)
     }
     
+    private var dateRangeText: String {
+        // Format dates to be more compact
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        
+        let startDate = ISO8601DateFormatter().date(from: window.start + "T00:00:00Z") ?? Date()
+        let endDate = ISO8601DateFormatter().date(from: window.endDisplay + "T00:00:00Z") ?? Date()
+        
+        let startText = formatter.string(from: startDate)
+        let endText = formatter.string(from: endDate)
+        
+        // Check if same year to avoid redundancy
+        let calendar = Calendar.current
+        let startYear = calendar.component(.year, from: startDate)
+        let endYear = calendar.component(.year, from: endDate)
+        let currentYear = calendar.component(.year, from: Date())
+        
+        if startYear == endYear && startYear == currentYear {
+            return "\(startText) - \(endText)"
+        } else {
+            formatter.dateFormat = "MMM d, yyyy"
+            return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
+        }
+    }
+    
     var body: some View {
         ExpandableCard {
             // Header content
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Window")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("\(window.start) → \(window.endDisplay)")
+            VStack(alignment: .leading, spacing: 16) {
+                // Top row - Window period and End Balance
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("Window Period")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text(dateRangeText)
                             .font(.headline)
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                     
-                    Spacer()
+                    Spacer(minLength: 16)
                     
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("End Balance")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(String(format: "%.2f h", window.endBalance))
+                    VStack(alignment: .trailing, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Text("End Balance")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Image(systemName: window.endBalance >= 0 ? "checkmark.circle" : "exclamationmark.triangle")
+                                .font(.caption)
+                                .foregroundColor(window.endBalance >= 0 ? .green : .orange)
+                        }
+                        
+                        Text(String(format: "%.1f h", window.endBalance))
                             .font(.headline.monospacedDigit())
+                            .fontWeight(.semibold)
                             .foregroundColor(window.endBalance >= 0 ? .green : .red)
                     }
                 }
                 
-                HStack(spacing: 20) {
-                    DataRow(
-                        label: "Accrual Date",
-                        value: window.accrualDate
+                // Bottom row - Key metrics in a grid
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
+                ], spacing: 16) {
+                    MetricCell(
+                        title: "Accrual Date",
+                        value: formatAccrualDate(window.accrualDate),
+                        icon: "plus.circle",
+                        color: .blue
                     )
                     
-                    DataRow(
-                        label: "Start Balance",
-                        value: String(format: "%.2f h", window.startBalance)
+                    MetricCell(
+                        title: "Start Balance",
+                        value: String(format: "%.1f h", window.startBalance),
+                        icon: "hourglass.bottomhalf.filled",
+                        color: .secondary
                     )
                     
-                    DataRow(
-                        label: "PTO Used",
-                        value: String(format: "-%.2f h", window.ptoUsed),
-                        valueColor: .red
+                    MetricCell(
+                        title: "PTO Used",
+                        value: String(format: "%.1f h", window.ptoUsed),
+                        icon: "minus.circle",
+                        color: window.ptoUsed > 0 ? .red : .secondary
                     )
                 }
             }
             
         } details: {
             // Expandable details content
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Entries in Window")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+            VStack(alignment: .leading, spacing: 20) {
+                // Entries section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "list.bullet")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        
+                        Text("Entries in Window")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        
+                        if !window.entries.isEmpty {
+                            Spacer()
+                            Text("\(window.entries.count)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                        }
+                    }
                     
                     ChipList(items: window.entries.map { entry in
-                        "\(entry.date): -\(String(format: "%.2f", entry.hours)) h" + 
+                        "\(formatEntryDate(entry.date)): -\(String(format: "%.1f", entry.hours))h" + 
                         (entry.note.isEmpty ? "" : " — \(entry.note)")
-                    })
+                    }, emptyText: "No entries in this window")
                 }
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Accrual Override")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
+                Divider()
+                
+                // Accrual override section
+                VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        TextField("Override", value: $overrideValue, format: .number.precision(.fractionLength(2)))
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .keyboardType(.decimalPad)
-                            .frame(width: 100)
-                            .onChange(of: overrideValue) { _, newValue in
-                                onOverrideChange(newValue)
-                            }
-                        
-                        Text("(computed: +\(String(format: "%.2f", window.computedAccrual)) h)")
+                        Image(systemName: "slider.horizontal.3")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.orange)
+                        
+                        Text("Accrual Override")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Override Value")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            
+                            TextField("Hours", value: $overrideValue, format: .number.precision(.fractionLength(2)))
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .keyboardType(.decimalPad)
+                                .frame(width: 80)
+                                .onChange(of: overrideValue) { _, newValue in
+                                    onOverrideChange(newValue)
+                                }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Computed")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            
+                            Text(String(format: "%.1f h", window.computedAccrual))
+                                .font(.caption.monospacedDigit())
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        }
                         
                         Spacer()
                     }
                 }
                 
-                Button("Manage Entries", action: onManageEntries)
-                    .buttonStyle(.bordered)
+                // Action button
+                Button(action: onManageEntries) {
+                    HStack {
+                        Image(systemName: "pencil")
+                        Text("Manage Entries")
+                    }
+                    .font(.subheadline.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
         }
+    }
+    
+    private func formatAccrualDate(_ dateString: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        
+        guard let date = formatter.date(from: dateString) else { return dateString }
+        
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+    
+    private func formatEntryDate(_ dateString: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        
+        guard let date = formatter.date(from: dateString) else { return dateString }
+        
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - Metric Cell Component
+struct MetricCell: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundColor(color)
+                
+                Text(title)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            
+            Text(value)
+                .font(.caption.monospacedDigit())
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 6)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
