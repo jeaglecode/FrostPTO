@@ -66,9 +66,23 @@ struct ContentView: View {
 }
 
 #Preview {
+    RootView()
+        .environmentObject(SettingsStore())
+        .environmentObject(NavRouter())
+}
+
+#Preview("Dark Mode") {
     ContentView()
         .environmentObject(SettingsStore())
         .environmentObject(NavRouter())
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Light Mode") {
+    ContentView()
+        .environmentObject(SettingsStore())
+        .environmentObject(NavRouter())
+        .preferredColorScheme(.light)
 }
 
 #Preview("PreferencesView") {
