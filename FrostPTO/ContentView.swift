@@ -133,6 +133,7 @@ struct PTOPreferencesForm: View {
     @State private var startBalText: String = ""
     @State private var hoursPerYearText: String = ""
     @State private var hoursPerPeriodText: String = ""
+    @State private var carryCapText: String = ""
     
     private enum FocusedField: Hashable {
         case startBal, hoursPerYear, hoursPerPeriod, carryCap, customDays
@@ -140,23 +141,7 @@ struct PTOPreferencesForm: View {
     
     @FocusState private var focusedField: FocusedField?
     
-    // Binding String <-> Optional Double for carryCap, enforcing period-only decimal
-    private var carryCapTextBinding: Binding<String> {
-        Binding<String>(
-            get: {
-                if let cap = settings.carryCap { return String(cap) }
-                return ""
-            },
-            set: { newVal in
-                let sanitized = sanitizeDotOnly(newVal)
-                if sanitized.isEmpty {
-                    settings.carryCap = nil
-                } else if let num = Double(sanitized) {
-                    settings.carryCap = num
-                }
-            }
-        )
-    }
+
     
     private var useDefaultCarryResetBinding: Binding<Bool> {
         Binding<Bool>(
@@ -319,12 +304,21 @@ struct PTOPreferencesForm: View {
                             HStack {
                                 Text("Cap (hours)")
                                 Spacer()
-                                TextField("optional", text: carryCapTextBinding)
+                                TextField("optional", text: $carryCapText)
                                     .keyboardType(.decimalPad)
                                     .multilineTextAlignment(.trailing)
                                     .textFieldStyle(.roundedBorder)
                                     .focused($focusedField, equals: .carryCap)
                                     .frame(maxWidth: 160)
+                                    .onChange(of: carryCapText) { newVal in
+                                        let sanitized = sanitizeDotOnly(newVal)
+                                        if sanitized != newVal { carryCapText = sanitized }
+                                        if sanitized.isEmpty {
+                                            settings.carryCap = nil
+                                        } else if let num = Double(sanitized) {
+                                            settings.carryCap = num
+                                        }
+                                    }
                             }
                             
                             Toggle("Use default Jan 1 reset", isOn: useDefaultCarryResetBinding)
@@ -359,6 +353,7 @@ struct PTOPreferencesForm: View {
                 startBalText = settings.startBal == 0 ? "" : String(settings.startBal)
                 hoursPerYearText = settings.hoursPerYear == 0 ? "" : String(settings.hoursPerYear)
                 hoursPerPeriodText = settings.hoursPerPeriod == 0 ? "" : String(settings.hoursPerPeriod)
+                carryCapText = settings.carryCap == nil ? "" : String(settings.carryCap!)
             }
         }
     }
