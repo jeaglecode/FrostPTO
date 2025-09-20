@@ -34,8 +34,9 @@ struct Card<Content: View>: View {
 }
 
 // MARK: - Expandable Card for Complex Data
-struct ExpandableCard<Header: View, Details: View>: View {
+struct ExpandableCard<Header: View, Details: View, HeaderAccessory: View>: View {
     @ViewBuilder var header: Header
+    @ViewBuilder var headerAccessory: HeaderAccessory
     @ViewBuilder var details: Details
     @State private var isExpanded = false
     
@@ -46,11 +47,13 @@ struct ExpandableCard<Header: View, Details: View>: View {
         padding: CGFloat = 16,
         cornerRadius: CGFloat = 16,
         @ViewBuilder header: () -> Header,
+        @ViewBuilder headerAccessory: () -> HeaderAccessory,
         @ViewBuilder details: () -> Details
     ) {
         self.padding = padding
         self.cornerRadius = cornerRadius
         self.header = header()
+        self.headerAccessory = headerAccessory()
         self.details = details()
     }
     
@@ -60,23 +63,29 @@ struct ExpandableCard<Header: View, Details: View>: View {
             VStack(alignment: .leading, spacing: 12) {
                 header
                 
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        isExpanded.toggle()
+                HStack(alignment: .center) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isExpanded.toggle()
+                        }
+                    }) {
+                        HStack {
+                            Text(isExpanded ? "Hide Details" : "Show Details")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Image(systemName: "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        }
                     }
-                }) {
-                    HStack {
-                        Text(isExpanded ? "Hide Details" : "Show Details")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer(minLength: 8)
+                    
+                    headerAccessory
                 }
-                .buttonStyle(PlainButtonStyle())
             }
             .padding(padding)
             
@@ -217,21 +226,13 @@ struct AccrualWindowCard: View {
             return "\(window.start) - \(window.endDisplay)"
         }
         
-        // Check if same year to avoid redundancy
-        let calendar = Calendar.current
-        let startYear = calendar.component(.year, from: startDate)
-        let endYear = calendar.component(.year, from: endDate)
-        let currentYear = calendar.component(.year, from: Date())
-        
-        // For the first window OR if years are different from current year, show years
-        if isFirstWindow || startYear != currentYear || endYear != currentYear || startYear != endYear {
-            // Show with 2-digit year
-            formatter.dateFormat = "MMM d, yy"
+        // Show full year only for the first window; omit years for subsequent windows
+        if isFirstWindow {
+            formatter.dateFormat = "MMM d, yyyy"
             let startText = formatter.string(from: startDate)
             let endText = formatter.string(from: endDate)
             return "\(startText) - \(endText)"
         } else {
-            // Show without year for current year windows (except first)
             formatter.dateFormat = "MMM d"
             let startText = formatter.string(from: startDate)
             let endText = formatter.string(from: endDate)
@@ -243,7 +244,7 @@ struct AccrualWindowCard: View {
         ExpandableCard {
             // Header content
             VStack(alignment: .leading, spacing: 16) {
-                // Top row - Window period and End Balance
+                // Top row - Window period only
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
@@ -264,23 +265,6 @@ struct AccrualWindowCard: View {
                     }
                     
                     Spacer(minLength: 16)
-                    
-                    VStack(alignment: .trailing, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Text("End Balance")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Image(systemName: window.endBalance >= 0 ? "checkmark.circle" : "exclamationmark.triangle")
-                                .font(.caption)
-                                .foregroundColor(window.endBalance >= 0 ? .green : .orange)
-                        }
-                        
-                        Text(String(format: "%.1f h", window.endBalance))
-                            .font(.headline.monospacedDigit())
-                            .fontWeight(.semibold)
-                            .foregroundColor(window.endBalance >= 0 ? .green : .red)
-                    }
                 }
                 
                 // Bottom row - Key metrics in a grid
@@ -311,7 +295,21 @@ struct AccrualWindowCard: View {
                     )
                 }
             }
-            
+        } headerAccessory: {
+            HStack(spacing: 8) {
+                Text("End Balance")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Image(systemName: window.endBalance >= 0 ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundColor(window.endBalance >= 0 ? .green : .orange)
+                
+                Text(String(format: "%.1f h", window.endBalance))
+                    .font(.caption.monospacedDigit())
+                    .fontWeight(.semibold)
+                    .foregroundColor(window.endBalance >= 0 ? .green : .red)
+            }
         } details: {
             // Expandable details content
             VStack(alignment: .leading, spacing: 20) {
@@ -544,7 +542,7 @@ extension AccrualWindow {
                 }
             } else {
                 // Start from December 31st of previous year
-                windowStartDate = calendar.date(from: DateComponents(year: targetYear - 1, month: 12, day: 31)) ?? 
+                windowStartDate = calendar.date(from: DateComponents(year: targetYear - 1, month: 12, day: 31)) ??
                     calendar.date(from: DateComponents(year: targetYear, month: 1, day: 1))!
             }
             
@@ -552,9 +550,10 @@ extension AccrualWindow {
                 return []
             }
             
+            let endDisplayDate = calendar.date(byAdding: .day, value: -1, to: yearEnd) ?? yearEnd
             let window = AccrualWindow(
                 start: formatDate(windowStartDate),
-                endDisplay: formatDate(yearEnd),
+                endDisplay: formatDate(endDisplayDate),
                 accrualDate: formatDate(yearEnd),
                 startBalance: settings.startBal,
                 ptoUsed: 0.0,
@@ -597,7 +596,7 @@ extension AccrualWindow {
             }
         } else {
             // Start from December 31st of the previous year
-            windowStart = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) ?? 
+            windowStart = calendar.date(from: DateComponents(year: year - 1, month: 12, day: 31)) ??
                 calendar.date(from: DateComponents(year: year, month: 1, day: 1))!
         }
         
@@ -605,9 +604,10 @@ extension AccrualWindow {
         for month in 1...12 {
             // First accrual: 15th of the month
             if let fifteenth = calendar.date(from: DateComponents(year: year, month: month, day: 15)) {
+                let endDisplayDate = calendar.date(byAdding: .day, value: -1, to: fifteenth) ?? fifteenth
                 let window = AccrualWindow(
                     start: formatDate(windowStart),
-                    endDisplay: formatDate(fifteenth),
+                    endDisplay: formatDate(endDisplayDate),
                     accrualDate: formatDate(fifteenth),
                     startBalance: calculateStartBalance(for: windowStart, settings: settings),
                     ptoUsed: 0.0,
@@ -616,6 +616,7 @@ extension AccrualWindow {
                     entries: []
                 )
                 windows.append(window)
+                // Next window starts on the accrual date (15th)
                 windowStart = fifteenth
             }
             
@@ -624,9 +625,10 @@ extension AccrualWindow {
             let lastDay = range?.count ?? 31
             
             if let monthEnd = calendar.date(from: DateComponents(year: year, month: month, day: lastDay)) {
+                let endDisplayDate = calendar.date(byAdding: .day, value: -1, to: monthEnd) ?? monthEnd
                 let window = AccrualWindow(
                     start: formatDate(windowStart),
-                    endDisplay: formatDate(monthEnd),
+                    endDisplay: formatDate(endDisplayDate),
                     accrualDate: formatDate(monthEnd),
                     startBalance: calculateStartBalance(for: windowStart, settings: settings),
                     ptoUsed: 0.0,
@@ -635,6 +637,7 @@ extension AccrualWindow {
                     entries: []
                 )
                 windows.append(window)
+                // Next window starts on the accrual date (month end)
                 windowStart = monthEnd
             }
         }
@@ -654,3 +657,4 @@ extension AccrualWindow {
         return formatter.string(from: date)
     }
 }
+
