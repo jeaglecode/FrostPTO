@@ -203,14 +203,19 @@ struct AccrualWindowCard: View {
     let onOverrideChange: (Double) -> Void
     let onManageEntries: () -> Void
     let isFirstWindow: Bool
+    let forceExpanded: Bool
+    let toggleCounter: Int  // Add toggle counter
     
     @State private var overrideValue: Double
+    @State private var isCollapsed = true
     
-    init(window: AccrualWindow, onOverrideChange: @escaping (Double) -> Void, onManageEntries: @escaping () -> Void, isFirstWindow: Bool = false) {
+    init(window: AccrualWindow, onOverrideChange: @escaping (Double) -> Void, onManageEntries: @escaping () -> Void, isFirstWindow: Bool = false, forceExpanded: Bool = false, toggleCounter: Int = 0) {
         self.window = window
         self.onOverrideChange = onOverrideChange
         self.onManageEntries = onManageEntries
         self.isFirstWindow = isFirstWindow
+        self.forceExpanded = forceExpanded
+        self.toggleCounter = toggleCounter
         self._overrideValue = State(initialValue: window.accrualOverride)
     }
     
@@ -233,153 +238,123 @@ struct AccrualWindowCard: View {
         return "\(startText) - \(endText)"
     }
     
+    private var effectiveCollapsedState: Bool {
+        isCollapsed
+    }
+    
     var body: some View {
-        ExpandableCard {
-            // Header content
-            VStack(alignment: .leading, spacing: 16) {
-                // Top row - Window period only
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(dateRangeText)
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            // Header section - always visible
+            VStack(alignment: .leading, spacing: 12) {
+                // Window period date and collapse button
+                HStack {
+                    Text(dateRangeText)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     
-                    Spacer(minLength: 16)
-                }
-                
-                // Bottom row - Key metrics in a grid
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8)
-                ], spacing: 16) {
-                    MetricCell(
-                        title: "Accrual Date",
-                        value: formatAccrualDate(window.accrualDate),
-                        icon: "plus.circle",
-                        color: .blue
-                    )
+                    Spacer()
                     
-                    MetricCell(
-                        title: "Start Balance",
-                        value: String(format: "%.1f h", window.startBalance),
-                        icon: "hourglass.bottomhalf.filled",
-                        color: .secondary
-                    )
-                    
-                    MetricCell(
-                        title: "PTO Used",
-                        value: String(format: "%.1f h", window.ptoUsed),
-                        icon: "minus.circle",
-                        color: window.ptoUsed > 0 ? .red : .secondary
-                    )
-                }
-            }
-        } headerAccessory: {
-            HStack(spacing: 8) {
-                Text("End Balance")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Image(systemName: window.endBalance >= 0 ? "checkmark.circle" : "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundColor(window.endBalance >= 0 ? .green : .orange)
-                
-                Text(String(format: "%.1f h", window.endBalance))
-                    .font(.caption.monospacedDigit())
-                    .fontWeight(.semibold)
-                    .foregroundColor(window.endBalance >= 0 ? .green : .red)
-            }
-        } details: {
-            // Expandable details content
-            VStack(alignment: .leading, spacing: 20) {
-                // Entries section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "list.bullet")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                        
-                        Text("Entries in Window")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        
-                        if !window.entries.isEmpty {
-                            Spacer()
-                            Text("\(window.entries.count)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
-                        }
-                    }
-                    
-                    ChipList(items: window.entries.map { entry in
-                        "\(formatEntryDate(entry.date)): -\(String(format: "%.1f", entry.hours))h" + 
-                        (entry.note.isEmpty ? "" : " — \(entry.note)")
-                    }, emptyText: "No entries in this window")
-                }
-                
-                Divider()
-                
-                // Accrual override section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        
-                        Text("Accrual Override")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Override Value")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            
-                            TextField("Hours", value: $overrideValue, format: .number.precision(.fractionLength(2)))
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .keyboardType(.decimalPad)
-                                .frame(width: 80)
-                                .onChange(of: overrideValue) { _, newValue in
-                                    onOverrideChange(newValue)
-                                }
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Computed")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            
-                            Text(String(format: "%.1f h", window.computedAccrual))
+                    // Show PTO used and PTO balance when collapsed
+                    if effectiveCollapsedState {
+                        HStack(spacing: 8) {
+                            Text(String(format: "%.1fh", window.ptoUsed))
                                 .font(.caption.monospacedDigit())
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                                .fontWeight(.medium)
+                                .foregroundColor(window.ptoUsed > 0 ? .red : .secondary)
+                            
+                            Text(String(format: "%.1f PTO", window.endBalance))
+                                .font(.caption.monospacedDigit())
+                                .fontWeight(.medium)
+                                .foregroundColor(window.endBalance >= 0 ? .green : .red)
                         }
-                        
-                        Spacer()
                     }
+                    
+                    // Collapse/Expand button (minus/plus icon)
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isCollapsed.toggle()
+                        }
+                    }) {
+                        Image(systemName: effectiveCollapsedState ? "plus.circle" : "minus.circle")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
-                // Action button
-                Button(action: onManageEntries) {
-                    HStack {
-                        Image(systemName: "pencil")
-                        Text("Manage Entries")
+                // Collapsible content
+                if !effectiveCollapsedState {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Key metrics in a grid
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8)
+                        ], spacing: 16) {
+                            MetricCell(
+                                title: "Accrual Date",
+                                value: formatAccrualDate(window.accrualDate),
+                                icon: "plus.circle",
+                                color: .blue
+                            )
+                            
+                            MetricCell(
+                                title: "Start Balance",
+                                value: String(format: "%.1f h", window.startBalance),
+                                icon: "hourglass.bottomhalf.filled",
+                                color: .secondary
+                            )
+                            
+                            MetricCell(
+                                title: "PTO Used",
+                                value: String(format: "%.1f h", window.ptoUsed),
+                                icon: "minus.circle",
+                                color: window.ptoUsed > 0 ? .red : .secondary
+                            )
+                        }
+                        
+                        // End balance - smaller with PTO suffix
+                        HStack {
+                            Spacer()
+                            Text(String(format: "%.1f PTO", window.endBalance))
+                                .font(.caption.monospacedDigit())
+                                .fontWeight(.medium)
+                                .foregroundColor(window.endBalance >= 0 ? .green : .red)
+                        }
+                        
+                        Divider()
+                        
+                        // Show Details section (expandable for additional info)
+                        ExpandableAccrualDetails(
+                            window: window,
+                            overrideValue: $overrideValue,
+                            onOverrideChange: onOverrideChange,
+                            onManageEntries: onManageEntries
+                        )
                     }
-                    .font(.subheadline.weight(.medium))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
+            }
+            .padding(16)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onChange(of: forceExpanded) { _, newValue in
+            // When light switch changes, update this card's state accordingly
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                isCollapsed = !newValue  // If forceExpanded is true, make collapsed false (expanded)
+            }
+        }
+        .onChange(of: toggleCounter) { _, _ in
+            // Force update when toggle counter changes
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                isCollapsed = !forceExpanded
             }
         }
     }
@@ -392,6 +367,135 @@ struct AccrualWindowCard: View {
         
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Expandable Accrual Details
+struct ExpandableAccrualDetails: View {
+    let window: AccrualWindow
+    @Binding var overrideValue: Double
+    let onOverrideChange: (Double) -> Void
+    let onManageEntries: () -> Void
+    @State private var showDetails = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Show/Hide Details button
+            Button(action: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    showDetails.toggle()
+                }
+            }) {
+                HStack {
+                    Text(showDetails ? "Hide Details" : "Show Details")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(showDetails ? 180 : 0))
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Expandable details content
+            if showDetails {
+                VStack(alignment: .leading, spacing: 20) {
+                    Divider()
+                        .padding(.top, 12)
+                    
+                    // Entries section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "list.bullet")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            
+                            Text("Entries in Window")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            if !window.entries.isEmpty {
+                                Spacer()
+                                Text("\(window.entries.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                            }
+                        }
+                        
+                        ChipList(items: window.entries.map { entry in
+                            "\(formatEntryDate(entry.date)): -\(String(format: "%.1f", entry.hours))h" + 
+                            (entry.note.isEmpty ? "" : " — \(entry.note)")
+                        }, emptyText: "No entries in this window")
+                    }
+                    
+                    Divider()
+                    
+                    // Accrual override section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                            
+                            Text("Accrual Override")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Override Value")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                TextField("Hours", value: $overrideValue, format: .number.precision(.fractionLength(2)))
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .keyboardType(.decimalPad)
+                                    .frame(width: 80)
+                                    .onChange(of: overrideValue) { _, newValue in
+                                        onOverrideChange(newValue)
+                                    }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Computed")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(String(format: "%.1f h", window.computedAccrual))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                    
+                    // Action button
+                    Button(action: onManageEntries) {
+                        HStack {
+                            Image(systemName: "pencil")
+                            Text("Manage Entries")
+                        }
+                        .font(.subheadline.weight(.medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
+                ))
+            }
+        }
     }
     
     private func formatEntryDate(_ dateString: String) -> String {

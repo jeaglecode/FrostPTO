@@ -1,4 +1,4 @@
-//
+so when I toogle up it missed some of the record if I scrool down
 //  ContentView.swift
 //  FrostPTO
 //
@@ -100,3 +100,4 @@ struct ContentView: View {
             .environmentObject(SettingsStore())
     }
 }
+

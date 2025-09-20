@@ -10,6 +10,8 @@ import SwiftUI
 struct AccrualsView: View {
     @EnvironmentObject private var settings: SettingsStore
     @State private var accrualWindows: [AccrualWindow] = []
+    @State private var allCardsExpanded = false
+    @State private var toggleCounter = 0  // Add counter to force updates
     
     private var displayYear: Int {
         let calendar = Calendar.current
@@ -20,7 +22,7 @@ struct AccrualsView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            VStack(spacing: 16) {  // Changed from LazyVStack to VStack
                 if accrualWindows.isEmpty {
                     // Loading or empty state
                     Card {
@@ -57,7 +59,9 @@ struct AccrualsView: View {
                             onManageEntries: {
                                 manageEntries(for: index)
                             },
-                            isFirstWindow: index == 0
+                            isFirstWindow: index == 0,
+                            forceExpanded: allCardsExpanded,
+                            toggleCounter: toggleCounter  // Pass counter to force updates
                         )
                         .padding(.horizontal)
                     }
@@ -74,6 +78,19 @@ struct AccrualsView: View {
             ToolbarItem(placement: .principal) {
                 Text("Accruals " + String(displayYear))
                     .font(.title2.weight(.semibold))
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        allCardsExpanded.toggle()
+                        toggleCounter += 1  // Increment counter to force all cards to update
+                    }
+                }) {
+                    Image(systemName: allCardsExpanded ? "lightswitch.on" : "lightswitch.off")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
             }
         }
         .refreshable {
