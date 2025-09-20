@@ -11,6 +11,13 @@ struct AccrualsView: View {
     @EnvironmentObject private var settings: SettingsStore
     @State private var accrualWindows: [AccrualWindow] = []
     
+    private var displayYear: Int {
+        let calendar = Calendar.current
+        return settings.useStartDateForAccruals
+            ? calendar.component(.year, from: settings.startDate)
+            : settings.currentYear
+    }
+    
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
@@ -59,11 +66,13 @@ struct AccrualsView: View {
             .padding(.top)
             .padding(.bottom, 120) // Extra bottom padding to ensure last card is fully accessible
         }
-        .navigationTitle("Accruals")
+        .scrollDismissesKeyboard(.interactively)
+        .onTapGesture { dismissKeyboard() }
+        .navigationTitle("Accruals " + String(displayYear))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("Accruals")
+                Text("Accruals " + String(displayYear))
                     .font(.title2.weight(.semibold))
             }
         }
@@ -148,6 +157,12 @@ struct AccrualsView: View {
         // In a real app, you'd present an entry management view
     }
     
+    private func dismissKeyboard() {
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
+    }
+    
     private func refreshData() async {
         // Simulate network refresh
         try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
@@ -157,3 +172,4 @@ struct AccrualsView: View {
         }
     }
 }
+

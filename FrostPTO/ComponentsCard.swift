@@ -226,18 +226,11 @@ struct AccrualWindowCard: View {
             return "\(window.start) - \(window.endDisplay)"
         }
         
-        // Show full year only for the first window; omit years for subsequent windows
-        if isFirstWindow {
-            formatter.dateFormat = "MMM d, yyyy"
-            let startText = formatter.string(from: startDate)
-            let endText = formatter.string(from: endDate)
-            return "\(startText) - \(endText)"
-        } else {
-            formatter.dateFormat = "MMM d"
-            let startText = formatter.string(from: startDate)
-            let endText = formatter.string(from: endDate)
-            return "\(startText) - \(endText)"
-        }
+        // Omit year for all windows for a cleaner header
+        formatter.dateFormat = "MMM d"
+        let startText = formatter.string(from: startDate)
+        let endText = formatter.string(from: endDate)
+        return "\(startText) - \(endText)"
     }
     
     var body: some View {
@@ -247,16 +240,6 @@ struct AccrualWindowCard: View {
                 // Top row - Window period only
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "calendar")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text("Window Period")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
                         Text(dateRangeText)
                             .font(.headline)
                             .fontWeight(.semibold)

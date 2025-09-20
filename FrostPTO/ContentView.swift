@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selected: Route = .planner
+    @State private var isKeyboardVisible: Bool = false
 
     var body: some View {
         Group {
@@ -52,16 +53,24 @@ struct ContentView: View {
                 .id(Route.preferences)
             }
         }
-        .safeAreaInset(edge: .bottom, content: {
-            BottomBar(
-                onSelect: { route in
-                    // Switch tabs with no animations
-                    withAnimation(.none) { selected = route }
-                },
-                selected: selected
-            )
-        })
+        .safeAreaInset(edge: .bottom) {
+            if !isKeyboardVisible {
+                BottomBar(
+                    onSelect: { route in
+                        // Switch tabs with no animations
+                        withAnimation(.none) { selected = route }
+                    },
+                    selected: selected
+                )
+            }
+        }
         .animation(nil, value: selected)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            isKeyboardVisible = false
+        }
     }
 }
 
