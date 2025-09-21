@@ -51,11 +51,18 @@ struct PreferencesView: View {
                         ProfileEditView().environmentObject(settings)
                     }
                     Divider()
-                    HStack(spacing: 12) {
-                        Image(systemName: "switch.2")
-                            .foregroundStyle(.secondary)
-                        Toggle("Toggle Preference", isOn: $settings.accrualsTogglePreference)
-                            .toggleStyle(.switch)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Toggle Preference")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer(minLength: 4)
+                        HStack {
+                            Text("Expand records by default")
+                                .font(.body)
+                            Spacer()
+                            Toggle("Expand records by default", isOn: $settings.accrualsTogglePreference)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
                     }
                 }
                 .padding(16)
@@ -103,3 +110,4 @@ struct PreferencesView: View {
         }
     }
 }
+
