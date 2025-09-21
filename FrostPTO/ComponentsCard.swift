@@ -345,6 +345,10 @@ struct AccrualWindowCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onAppear {
+            // Ensure initial state matches the forced expand/collapse preference
+            isCollapsed = !forceExpanded
+        }
         .onChange(of: forceExpanded) { _, newValue in
             // When light switch changes, update this card's state accordingly
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {

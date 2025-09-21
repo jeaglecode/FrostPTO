@@ -50,6 +50,13 @@ struct PreferencesView: View {
                     NavigationLink("Edit Profile") {
                         ProfileEditView().environmentObject(settings)
                     }
+                    Divider()
+                    HStack(spacing: 12) {
+                        Image(systemName: "switch.2")
+                            .foregroundStyle(.secondary)
+                        Toggle("Toggle Preference", isOn: $settings.accrualsTogglePreference)
+                            .toggleStyle(.switch)
+                    }
                 }
                 .padding(16)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

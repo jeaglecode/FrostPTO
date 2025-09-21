@@ -98,6 +98,15 @@ struct AccrualsView: View {
         }
         .onAppear {
             generateAccrualWindows()
+            // React to user preference from Profile
+            if settings.accrualsTogglePreference {
+                // Example behavior: expand all cards on enter when enabled
+                allCardsExpanded = true
+                toggleCounter += 1
+            } else {
+                allCardsExpanded = false
+                toggleCounter += 1
+            }
         }
         .onChange(of: settings.mode) { _, _ in
             generateAccrualWindows()
@@ -122,6 +131,12 @@ struct AccrualsView: View {
         }
         .onChange(of: settings.startDate) { _, _ in
             if settings.useStartDateForAccruals { generateAccrualWindows() }
+        }
+        .onChange(of: settings.accrualsTogglePreference) { _, newValue in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                allCardsExpanded = newValue
+                toggleCounter += 1
+            }
         }
     }
     
