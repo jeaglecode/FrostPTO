@@ -271,17 +271,23 @@ struct AccrualWindowCard: View {
                         }
                     }
                     
-                    // Collapse/Expand button (minus/plus icon)
+                    // Collapse/Expand button (ellipsis icon with state-based color)
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             isCollapsed.toggle()
                         }
                     }) {
-                        Image(systemName: effectiveCollapsedState ? "plus.circle" : "minus.circle")
+                        Image(systemName: "ellipsis")
                             .font(.title2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(effectiveCollapsedState ? .white : .secondary)
                     }
                     .buttonStyle(PlainButtonStyle())
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        isCollapsed.toggle()
+                    }
                 }
                 
                 // Collapsible content
