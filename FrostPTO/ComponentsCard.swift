@@ -209,6 +209,8 @@ struct AccrualWindowCard: View {
     @State private var overrideValue: Double
     @State private var isCollapsed = true
     
+    @Environment(\.colorScheme) private var colorScheme
+    
     init(window: AccrualWindow, onOverrideChange: @escaping (Double) -> Void, onManageEntries: @escaping () -> Void, isFirstWindow: Bool = false, forceExpanded: Bool = false, toggleCounter: Int = 0) {
         self.window = window
         self.onOverrideChange = onOverrideChange
@@ -279,7 +281,13 @@ struct AccrualWindowCard: View {
                     }) {
                         Image(systemName: "ellipsis")
                             .font(.title2)
-                            .foregroundColor(effectiveCollapsedState ? .white : .secondary)
+                            .foregroundColor({
+                                if effectiveCollapsedState {
+                                    return colorScheme == .light ? .black : .white
+                                } else {
+                                    return .secondary
+                                }
+                            }())
                     }
                     .buttonStyle(PlainButtonStyle())
                 }

@@ -81,16 +81,7 @@ struct AccrualsView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        allCardsExpanded.toggle()
-                        toggleCounter += 1  // Increment counter to force all cards to update
-                    }
-                }) {
-                    Image(systemName: allCardsExpanded ? "lightswitch.on" : "lightswitch.off")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                }
+                ExpandToggle(isOn: $settings.accrualsTogglePreference)
             }
         }
         .refreshable {
